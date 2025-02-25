@@ -1,0 +1,204 @@
+name: Deployment CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install pytest pytest-cov
+        
+    - name: Run tests with coverage
+      run: |
+        pytest --cov=app --cov-report=xml
+        
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: true
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install linting dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black isort
+        
+    - name: Lint with flake8
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        
+    - name: Check formatting with black
+      run: |
+        black --check .
+        
+    - name: Check imports with isort
+      run: |
+        isort --check-only --profile black .
+
+  deploy:
+    needs: [test, lint]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Create deployment package
+      run: |
+        mkdir -p deployment
+        cp -r app deployment/
+        cp requirements.txt deployment/
+        cp -r scripts deployment/ || mkdir -p deployment/scripts
+        
+        # Create systemd service file
+        cat > deployment/scripts/fastapi.service << EOL
+        [Unit]
+        Description=FastAPI application
+        After=network.target
+
+        [Service]
+        User=ubuntu
+        WorkingDirectory=/home/ubuntu/fastapi-app
+        ExecStart=/home/ubuntu/fastapi-app/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+        Restart=always
+        Environment="PATH=/home/ubuntu/fastapi-app/venv/bin"
+        Environment="DATABASE_URL=${DATABASE_URL}"
+        Environment="SECRET_KEY=${SECRET_KEY}"
+
+        [Install]
+        WantedBy=multi-user.target
+        EOL
+        
+        # Create setup script
+        cat > deployment/scripts/setup.sh << EOL
+        #!/bin/bash
+        set -e
+
+        # Create virtual environment if it doesn't exist
+        if [ ! -d "venv" ]; then
+            python3 -m venv venv
+        fi
+
+        # Activate virtual environment and install dependencies
+        source venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        
+        # Copy systemd service file
+        sudo cp scripts/fastapi.service /etc/systemd/system/
+        sudo systemctl daemon-reload
+        
+        # Start/restart the service
+        sudo systemctl restart fastapi
+        sudo systemctl enable fastapi
+        EOL
+        
+        chmod +x deployment/scripts/setup.sh
+        
+        # Create Nginx configuration
+        cat > deployment/scripts/nginx-fastapi << EOL
+        server {
+            listen 80;
+            server_name _;
+
+            location / {
+                proxy_pass http://localhost:8000;
+                proxy_set_header Host \$host;
+                proxy_set_header X-Real-IP \$remote_addr;
+                proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto \$scheme;
+            }
+        }
+        EOL
+        
+        tar -czvf deployment.tar.gz -C deployment .
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
+        
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # Create app directory if it doesn't exist
+          mkdir -p ~/fastapi-app
+          cd ~/fastapi-app
+          
+          # Back up .env file if it exists
+          if [ -f .env ]; then
+            cp .env .env.backup
+          fi
+      
+    - name: Copy application files
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "deployment.tar.gz"
+        target: "~/fastapi-app"
+        
+    - name: Finalize deployment
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          cd ~/fastapi-app
+          
+          # Extract deployment files
+          tar -xzvf deployment.tar.gz
+          rm deployment.tar.gz
+          
+          # Restore .env if it was backed up
+          if [ -f .env.backup ]; then
+            cp .env.backup .env
+          fi
+          
+          # Setup Nginx if not already configured
+          if [ ! -f /etc/nginx/sites-enabled/fastapi ]; then
+            sudo apt-get update
+            sudo apt-get install -y nginx
+            sudo cp scripts/nginx-fastapi /etc/nginx/sites-available/fastapi
+            sudo ln -s /etc/nginx/sites-available/fastapi /etc/nginx/sites-enabled/
+            sudo rm -f /etc/nginx/sites-enabled/default
+            sudo systemctl restart nginx
+          fi
+          
+          # Run setup script
+          bash scripts/setup.sh
+          
+          # Verify deployment
+          sleep 5
+          curl -s http://localhost:8000/health || echo "Warning: Health check failed"

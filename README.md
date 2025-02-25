@@ -1,4 +1,4 @@
-# RAG System with FastAPI and Weaviate
+# RinggAI : Backend Engineering Take-Home Assignment
 
 This is a Retrieval Augmented Generation (RAG) system built with FastAPI and Weaviate. The system supports document ingestion, embedding generation, and question-answering capabilities.
 
@@ -44,6 +44,8 @@ pip install -r requirements.txt
 OPENAI_API_KEY=your_openai_api_key
 WEAVIATE_URL=your_weaviate_url
 WEAVIATE_API_KEY=your_weaviate_key
+AZURE_VISION_KEY=
+AZURE_VISION_ENDPOINT=
 ```
 
 5. Start the application:
@@ -59,10 +61,6 @@ uvicorn app.main:app --reload
   - Upload a new document
   - Supports PDF, DOCX, JSON, and TXT formats
   - Automatically generates and stores embeddings
-
-- `PUT /documents/{document_id}`
-  - Update an existing document
-  - Replaces old embeddings with new ones
 
 ### Querying
 
@@ -94,7 +92,3 @@ uvicorn app.main:app --reload
 - OpenAI's text-embedding model for high-quality embeddings
 - Document chunking for optimal retrieval performance
 - Modular architecture for easy maintenance and scalability
-
-## License
-
-MIT 

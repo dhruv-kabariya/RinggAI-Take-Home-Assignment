@@ -74,5 +74,9 @@ async def query_document(query: QueryRequest):
             )
         # raise   HTTPException(status_code=400, detail=str(e))
 
+@ragApp.get("/health")
+def health_check():
+    return {"status": "healthy"}
+
 if __name__ == "__main__":
     uvicorn.run("main:ragApp", host="0.0.0.0", port=8000, reload=True) 
