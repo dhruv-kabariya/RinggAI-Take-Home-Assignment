@@ -2,6 +2,11 @@
 
 This is a Retrieval Augmented Generation (RAG) system built with FastAPI and Weaviate. The system supports document ingestion, embedding generation, and question-answering capabilities.
 
+# Test URL
+
+
+
+
 ## Features
 
 - Document ingestion support for multiple formats:
@@ -28,18 +33,18 @@ git clone <repository-url>
 cd rag-system
 ```
 
-2. Create and activate a virtual environment:
+<!-- 2. Create and activate a virtual environment:
 ```bash
 python -m venv venv
 source venv/bin/activate
-```
+``` -->
 
-3. Install dependencies:
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Create a `.env` file with the following variables:
+3. Create a `.env` file with the following variables:
 ```
 OPENAI_API_KEY=your_openai_api_key
 WEAVIATE_URL=your_weaviate_url
@@ -48,7 +53,7 @@ AZURE_VISION_KEY=
 AZURE_VISION_ENDPOINT=
 ```
 
-5. Start the application:
+4. Start the application:
 ```bash
 uvicorn app.main:app --reload
 ```
