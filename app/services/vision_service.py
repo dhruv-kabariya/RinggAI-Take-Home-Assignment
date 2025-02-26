@@ -12,7 +12,17 @@ AZURE_HEADERS = {
 }
 
 async def azure_ocr(session,image):
-    """Extract text from an image using Azure Computer Vision OCR"""
+    """
+    Extract text from an image using Azure Computer Vision OCR.
+
+    This function takes an aiohttp session and a PIL image as input, converts the image to bytes,
+    and sends a POST request to the Azure Computer Vision OCR API. It then extracts and combines
+    the text from the response and returns it.
+
+    :param session: An aiohttp ClientSession object for making HTTP requests.
+    :param image: A PIL image object to be processed for OCR.
+    :return: The extracted text from the image or an error message if the request fails.
+    """
     try:
         # Convert PIL image to bytes
         img_byte_arr = io.BytesIO()
@@ -55,7 +65,17 @@ async def azure_ocr(session,image):
         return "OCR processing error"
 
 async def azure_image_caption(session,image):
-    """Generate a caption for an image using Azure Computer Vision"""
+    """
+    Generate a caption for an image using Azure Computer Vision.
+
+    This function takes an aiohttp session and a PIL image as input, converts the image to bytes,
+    and sends a POST request to the Azure Computer Vision API for image analysis. It then extracts
+    the caption from the response and returns it.
+
+    :param session: An aiohttp ClientSession object for making HTTP requests.
+    :param image: A PIL image object to be processed for captioning.
+    :return: The generated caption for the image or an error message if the request fails.
+    """
     try:
         # Convert PIL image to bytes
         img_byte_arr = io.BytesIO()
@@ -98,7 +118,17 @@ async def azure_image_caption(session,image):
         return "Caption generation error"
 
 async def process_image(session,image_data):
-    """Process a single image with both OCR and captioning in parallel"""
+    """
+    Process a single image with both OCR and captioning in parallel.
+
+    This function takes an aiohttp session and image data as input, creates a copy of the image,
+    and processes it for both OCR and captioning using the azure_ocr and azure_image_caption functions.
+    It then combines the results and returns them.
+
+    :param session: An aiohttp ClientSession object for making HTTP requests.
+    :param image_data: A tuple containing the PIL image object, page number, and image index.
+    :return: A dictionary containing the page number, image index, extracted text, and generated caption.
+    """
     image, page_no, img_index = image_data
     
     # Create a copy of the image for processing
@@ -116,7 +146,16 @@ async def process_image(session,image_data):
     }
 
 async def process_all_images_async(image_processing_tasks):
-    """Process all images using async"""
+    """
+    Process all images using async.
+
+    This function takes a list of image processing tasks as input, creates an aiohttp ClientSession,
+    and processes each image in parallel using the process_image function. It then gathers the results
+    and returns them.
+
+    :param image_processing_tasks: A list of tuples containing PIL image objects, page numbers, and image indices.
+    :return: A list of dictionaries containing the processing results for each image.
+    """
     processed_images = []
     
     # Create a ClientSession that will be used for all requests

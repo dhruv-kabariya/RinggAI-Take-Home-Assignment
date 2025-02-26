@@ -14,16 +14,32 @@ from models.api import DocumentMetadata
 from services.vision_service import process_all_images_async
 
 def check_allowed_file(file_content_type: str) -> bool:
+    """
+    Checks if the file content type is supported for processing.
+
+    Args:
+    - file_content_type (str): The MIME type of the file.
+
+    Returns:
+    - bool: True if the file type is supported, False otherwise.
+    """
     return file_content_type in SUPPORTED_DOCUMENT_TYPES.values()
    
 async def process_document(docId:str ,file: UploadFile) -> tuple:
-    """Process an uploaded document and store its chunks in Weaviate."""
+    """
+    Processes an uploaded document and stores its chunks in Weaviate.
+
+    Args:
+    - docId (str): The unique identifier for the document.
+    - file (UploadFile): The uploaded file to be processed.
+
+    Returns:
+    - tuple: A tuple containing the processed chunks and metadata of the document.
+    """
     if file.content_type not in SUPPORTED_DOCUMENT_TYPES.values():
         raise HTTPException(status_code=400, detail="Unsupported file type")
 
-
     # Read and process the document
-    
     content = await read_document(file)
     chunks = convert_to_chunk_and_schema(content,file.content_type,docId)
     
@@ -40,7 +56,15 @@ async def process_document(docId:str ,file: UploadFile) -> tuple:
     return (chunks,metadata)
 
 async def read_document( file: UploadFile) -> list:
-    """Read content from various document formats."""
+    """
+    Reads content from various document formats and extracts text and images.
+
+    Args:
+    - file (UploadFile): The uploaded file to be read and processed.
+
+    Returns:
+    - list: A list of dictionaries containing extracted data, including page number, text, and images.
+    """
     content = ""
     file_content = await file.read()
     extracted_data = []
@@ -159,8 +183,19 @@ async def read_document( file: UploadFile) -> list:
     extracted_data.sort(key=lambda x: (int(x["page_no"]), x["is_image"]))
     
     return extracted_data
+
 def convert_to_chunk_and_schema(extracted_data: list,file_type:str,docId:str) -> List[Dict]:
-    """Split text into overlapping chunks and return as a list of dictionaries."""
+    """
+    Splits text into overlapping chunks and returns as a list of dictionaries.
+
+    Args:
+    - extracted_data (list): A list of dictionaries containing extracted data.
+    - file_type (str): The type of the file.
+    - docId (str): The unique identifier for the document.
+
+    Returns:
+    - List[Dict]: A list of dictionaries representing the chunks of the document.
+    """
     chunks = []
     chunk_id = 0  
     
@@ -189,6 +224,4 @@ def convert_to_chunk_and_schema(extracted_data: list,file_type:str,docId:str) ->
                 start += CHUNK_SIZE - CHUNK_OVERLAP  # Move forward with overlap
 
     return chunks
-
-
 

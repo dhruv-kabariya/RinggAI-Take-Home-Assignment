@@ -6,11 +6,12 @@ import uvicorn
 from init import lifespan
 from services.document import process_document
 from services.weaviate import WeaviateService
+from services.llm_service import QueryEnhancer
 from utils.hash_generator import generate_document_id
 from models.api import QueryRequest, QueryResponse, ResponseModel, DocumentMetadata
 
 ragApp = FastAPI(
-    title="RAG System API",
+    title="RinggAI Backend Task",
     version="1.0.0",
     lifespan = lifespan,
 )
@@ -60,7 +61,8 @@ async def query_document(query: QueryRequest):
     Query against specific documents to retrieve relevant information.
     """
     try:
-        result = await WeaviateService().query(query.text, query.document_id)
+        enhancce_query = QueryEnhancer().enhance_query(query.text)
+        result = await WeaviateService().query(query_text= query.text,document_id= query.document_id,enhance_query=enhancce_query)
         return ResponseModel(
             data=result,
             status=200,
@@ -75,7 +77,8 @@ async def query_document(query: QueryRequest):
         # raise   HTTPException(status_code=400, detail=str(e))
 
 @ragApp.get("/health")
-def health_check():
+async def health_check():
+    # await WeaviateService().delete_collection()
     return {"status": "healthy"}
 
 if __name__ == "__main__":
